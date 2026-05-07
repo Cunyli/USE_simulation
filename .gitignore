@@ -1,0 +1,63 @@
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+
+# Virtual environments and local tooling
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Downloaded third-party code and model assets
+external/
+eval/
+*.onnx
+*.ckpt
+*.pt
+*.pth
+*.pkl
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+
+# Training outputs and local experiment artifacts
+checkpoints/
+ckpt/
+runs/
+logs/
+outputs/
+results/
+wandb/
+lightning_logs/
+tfevents/
+events.out.tfevents.*
+
+# Local datasets and generated audio artifacts
+data/*
+!data/train_speech.json
+!data/train_noise.json
+!data/train_rir.json
+!data/val_clean.json
+!data/val_degraded.json
+*.wav
+*.flac
+*.mp3
+*.ogg
+*.jsonl
+
+# Explicitly keep local pipeline checks out of git. These files are synthetic
+# fixtures for testing on this machine, not formal simulation data.
+data/local_smoke/
