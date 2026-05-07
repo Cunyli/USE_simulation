@@ -9,6 +9,7 @@ Standalone simulation utilities copied from `SEMambapp-Interspeech`.
 - `scripts/build_val_degraded.py`: generates offline degraded validation audio from JSON filelists.
 - `scripts/score_clean_speech_dnsmos.py`: scores clean-speech filelists with DNSMOS using the URGENT-style ONNX workflow.
 - `scripts/score_clean_speech_vqscore.py`: scores clean-speech filelists with the official JasonSWFu/VQscore quality-estimation model.
+- `scripts/summarize_quality_scores.py`: summarizes DNSMOS/VQScore distributions without filtering protected data.
 - `scripts/filter_clean_speech.py`: filters clean-speech JSON filelists using precomputed DNSMOS/VQScore metadata.
 - `scripts/prepare_local_smoke_data.py`: creates synthetic local-only fixtures for testing the pipeline without server data.
 - `config.yaml`: broad degradation and STFT defaults copied from the original project.
@@ -122,6 +123,23 @@ The output JSONL can be consumed directly by the filtering script. Supported
 score formats are CSV, JSONL, a JSON list of objects, or a JSON object keyed by
 audio path. Score records may use fields such as `path`, `ovrl`, `sig`, `bak`,
 `p808`, and `vqscore`.
+
+For pathological fine-tuning data, prefer summarizing the full dataset before
+any filtering decision:
+
+```bash
+conda run -n use_simulation python -m scripts.summarize_quality_scores \
+  --clean-json data/train_speech.json \
+  --scores data/train_speech.dnsmos.jsonl data/train_speech.vqscore.jsonl \
+  --output-json data/train_speech.quality_summary.json \
+  --worst-json data/train_speech.lowest_vqscore.json \
+  --worst-metric vqscore \
+  --worst-n 50
+```
+
+This reports count, mean, median, standard deviation, p05/p25/p75/p95, min/max,
+missing-score counts, and the lowest-score samples. It does not remove or
+rewrite any filelist.
 
 DNSMOS filtering is optional and defaults to off:
 

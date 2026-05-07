@@ -86,6 +86,15 @@ def load_quality_scores(path: Path) -> dict[str, dict[str, Any]]:
     return index
 
 
+def load_quality_score_records(path: Path) -> list[dict[str, Any]]:
+    records = []
+    for record in _read_score_records(path):
+        item_path = _record_path(record)
+        if item_path is not None:
+            records.append(_normalize_record(record))
+    return records
+
+
 def filter_clean_paths(
     clean_paths: list[str],
     score_index: dict[str, dict[str, Any]],
