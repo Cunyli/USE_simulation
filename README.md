@@ -7,11 +7,10 @@ Standalone simulation utilities copied from `SEMambapp-Interspeech`.
 - `simulate_degradation.py`: selects and applies degradation chains.
 - `simulate_degradation_utils.py`: noise, reverberation, bandwidth, clipping, packet-loss, and codec utilities.
 - `scripts/build_val_degraded.py`: generates offline degraded validation audio from JSON filelists.
-- `scripts/score_clean_speech_dnsmos.py`: scores clean-speech filelists with DNSMOS using the URGENT-style ONNX workflow.
-- `scripts/score_clean_speech_vqscore.py`: scores clean-speech filelists with the official JasonSWFu/VQscore quality-estimation model.
-- `scripts/summarize_quality_scores.py`: summarizes DNSMOS/VQScore distributions without filtering protected data.
+- `scripts/score_clean_speech_quality.py`: scores clean-speech filelists with DNSMOS and VQScore, then writes one quality JSON.
 - `scripts/filter_clean_speech.py`: filters clean-speech JSON filelists using precomputed DNSMOS/VQScore metadata.
 - `scripts/prepare_local_smoke_data.py`: creates synthetic local-only fixtures for testing the pipeline without server data.
+- `scripts/quality_*.py`: internal helpers used by the scoring and filtering scripts.
 - `config.yaml`: broad degradation and STFT defaults copied from the original project.
 - `configs/phone_room_22050.yaml`: Priority 1 AVQI profile, noise + RIR only at 22050 Hz.
 - `data/*.json`: copied filelists from the original project.
@@ -66,17 +65,11 @@ The copied filelists currently point to `/scratch/elec/t412-speechcom/...`, so r
 
 ## Clean-Target Quality Filtering
 
-This repository can compute DNSMOS using the same general approach as the
-URGENT evaluation scripts: load ESPnet's `DNSMOS_local`, download Microsoft's
-DNSMOS ONNX files when needed, resample audio to 16 kHz, and write scores to a
-JSONL file.
-
-VQScore is handled through a wrapper around the official
-`JasonSWFu/VQscore` quality-estimation model. The wrapper downloads only the
-required official files into `external/VQscore`: the two model-definition files,
-the quality-estimation config, and the quality-estimation checkpoint. It does
-not clone the full official repo, and it does not download VQscore's speech
-enhancement checkpoints or its bundled DNSMOS copy.
+This repository can score clean targets with DNSMOS and VQScore, then write one
+quality JSON that downstream filtering and simulation can reuse. DNSMOS follows
+the URGENT-style ESPnet `DNSMOS_local` workflow and uses Microsoft's ONNX
+models. VQScore uses the official `JasonSWFu/VQscore` quality-estimation model.
+Downloaded assets live under `eval/quality/DNSMOS` and `eval/quality/VQscore`.
 
 DNSMOS scoring requires optional dependencies that are not needed for normal
 simulation:
@@ -85,25 +78,16 @@ simulation:
 pip install espnet==202412 onnxruntime
 ```
 
-Run DNSMOS scoring on a clean JSON filelist:
+Run both DNSMOS and VQScore on a clean JSON filelist and write one merged
+quality file:
 
 ```bash
-conda run -n use_simulation python -m scripts.score_clean_speech_dnsmos \
+conda run -n use_simulation python -m scripts.score_clean_speech_quality \
   --input data/train_speech.json \
   --input-format json \
-  --output-jsonl data/train_speech.dnsmos.jsonl \
-  --device cpu
-```
-
-Run VQScore scoring on a clean JSON filelist:
-
-```bash
-conda run -n use_simulation python -m scripts.score_clean_speech_vqscore \
-  --input data/train_speech.json \
-  --input-format json \
-  --output-jsonl data/train_speech.vqscore.jsonl \
-  --vqscore-root external/VQscore \
-  --device auto
+  --output-json data/train_clean_quality.json \
+  --dnsmos-device cpu \
+  --vqscore-device auto
 ```
 
 By default, the VQScore wrapper uses the official quality-estimation config and
@@ -119,27 +103,9 @@ VQScore model. Add `--no-download` to require all VQScore files to already exist
 locally. The official VQScore quality-estimation checkpoint is about 11 MB. The
 two DNSMOS ONNX files are much smaller, about 1.1 MB and 0.2 MB.
 
-The output JSONL can be consumed directly by the filtering script. Supported
-score formats are CSV, JSONL, a JSON list of objects, or a JSON object keyed by
-audio path. Score records may use fields such as `path`, `ovrl`, `sig`, `bak`,
-`p808`, and `vqscore`.
-
-For pathological fine-tuning data, prefer summarizing the full dataset before
-any filtering decision:
-
-```bash
-conda run -n use_simulation python -m scripts.summarize_quality_scores \
-  --clean-json data/train_speech.json \
-  --scores data/train_speech.dnsmos.jsonl data/train_speech.vqscore.jsonl \
-  --output-json data/train_speech.quality_summary.json \
-  --worst-json data/train_speech.lowest_vqscore.json \
-  --worst-metric vqscore \
-  --worst-n 50
-```
-
-This reports count, mean, median, standard deviation, p05/p25/p75/p95, min/max,
-missing-score counts, and the lowest-score samples. It does not remove or
-rewrite any filelist.
+Downstream filtering and simulation can consume `data/train_clean_quality.json`
+directly. The filtering code also accepts CSV, JSONL, a JSON list of objects, or
+a JSON object keyed by audio path when you need to use older score files.
 
 DNSMOS filtering is optional and defaults to off:
 
@@ -147,7 +113,7 @@ DNSMOS filtering is optional and defaults to off:
 conda run -n use_simulation python -m scripts.filter_clean_speech \
   --input-json data/train_speech.json \
   --output-json data/train_speech.filtered.json \
-  --scores data/clean_quality_scores.jsonl \
+  --scores data/train_clean_quality.json \
   --use-dnsmos-filter \
   --dnsmos-threshold 3.0 \
   --vqscore-threshold 0.65 \
@@ -163,7 +129,7 @@ conda run -n use_simulation python -m scripts.build_val_degraded \
   --clean-json data/val_clean.json \
   --noise-json data/train_noise.json \
   --rir-json data/train_rir.json \
-  --quality-scores data/clean_quality_scores.jsonl \
+  --quality-scores data/train_clean_quality.json \
   --use-dnsmos-filter \
   --vqscore-threshold 0.65 \
   --quality-whitelist data/quality_whitelist.txt \

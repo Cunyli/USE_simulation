@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from scripts.quality_filtering import load_json_list
+from scripts.quality_utils import load_json_list
 
 
 TARGET_FS = 16000
@@ -23,6 +23,8 @@ DEFAULT_ASSETS = (
     DEFAULT_CONFIG,
     DEFAULT_CHECKPOINT,
 )
+DEFAULT_VQSCORE_ROOT = Path("./eval/quality/VQscore")
+LEGACY_VQSCORE_ROOT = Path("./external/VQscore")
 
 
 def load_scp(path: Path) -> list[tuple[str, str]]:
@@ -48,6 +50,15 @@ def resolve_under_root(path: Path | None, root: Path, default_relative: str) -> 
     if resolved.is_absolute():
         return resolved
     return root / resolved
+
+
+def resolve_vqscore_root(root: Path) -> Path:
+    if root.exists():
+        return root
+    if root == DEFAULT_VQSCORE_ROOT and LEGACY_VQSCORE_ROOT.exists():
+        print(f"Using legacy VQScore asset path: {LEGACY_VQSCORE_ROOT}")
+        return LEGACY_VQSCORE_ROOT
+    return root
 
 
 def download_if_not_exists(url: str, local_path: Path) -> None:
@@ -195,7 +206,7 @@ def main() -> None:
     parser.add_argument("--input", type=Path, required=True, help="Input JSON list or Kaldi-style scp.")
     parser.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL score file.")
     parser.add_argument("--input-format", choices=["json", "scp"], default="json")
-    parser.add_argument("--vqscore-root", type=Path, default=Path("./external/VQscore"))
+    parser.add_argument("--vqscore-root", type=Path, default=DEFAULT_VQSCORE_ROOT)
     parser.add_argument("--config", type=Path, default=None, help=f"VQScore config. Defaults to {DEFAULT_CONFIG}.")
     parser.add_argument(
         "--checkpoint",
@@ -220,6 +231,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None, help="Optional limit for a quick partial run.")
     args = parser.parse_args()
 
+    args.vqscore_root = resolve_vqscore_root(args.vqscore_root)
     config_path = resolve_under_root(args.config, args.vqscore_root, DEFAULT_CONFIG)
     checkpoint_path = resolve_under_root(args.checkpoint, args.vqscore_root, DEFAULT_CHECKPOINT)
     if not args.no_download:

@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from scripts.quality_filtering import load_json_list
+from scripts.quality_utils import load_json_list
 
 
 TARGET_FS = 16000
@@ -19,6 +19,19 @@ P808_MODEL_URL = (
     "https://github.com/microsoft/DNS-Challenge/raw/refs/heads/master/"
     "DNSMOS/DNSMOS/model_v8.onnx"
 )
+DEFAULT_DNSMOS_DIR = Path("./eval/quality/DNSMOS")
+LEGACY_DNSMOS_DIR = Path("./eval/DNSMOS")
+
+
+def resolve_default_model_path(path: Path, filename: str) -> Path:
+    if path.exists():
+        return path
+    default_path = DEFAULT_DNSMOS_DIR / filename
+    legacy_path = LEGACY_DNSMOS_DIR / filename
+    if path == default_path and legacy_path.exists():
+        print(f"Using legacy DNSMOS model path: {legacy_path}")
+        return legacy_path
+    return path
 
 
 def download_if_not_exists(url: str, local_path: Path) -> None:
@@ -116,12 +129,15 @@ def main() -> None:
     parser.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL score file.")
     parser.add_argument("--input-format", choices=["json", "scp"], default="json")
     parser.add_argument("--device", default="cpu", help="DNSMOS device, e.g. cpu or cuda.")
-    parser.add_argument("--primary-model", type=Path, default=Path("./eval/DNSMOS/sig_bak_ovr.onnx"))
-    parser.add_argument("--p808-model", type=Path, default=Path("./eval/DNSMOS/model_v8.onnx"))
+    parser.add_argument("--primary-model", type=Path, default=DEFAULT_DNSMOS_DIR / "sig_bak_ovr.onnx")
+    parser.add_argument("--p808-model", type=Path, default=DEFAULT_DNSMOS_DIR / "model_v8.onnx")
     parser.add_argument("--no-download", action="store_true", help="Do not auto-download DNSMOS ONNX files.")
     parser.add_argument("--convert-to-torch", action="store_true", help="Pass convert_to_torch=True to ESPnet DNSMOS.")
     parser.add_argument("--limit", type=int, default=None, help="Optional limit for a quick partial run.")
     args = parser.parse_args()
+
+    args.primary_model = resolve_default_model_path(args.primary_model, "sig_bak_ovr.onnx")
+    args.p808_model = resolve_default_model_path(args.p808_model, "model_v8.onnx")
 
     if not args.no_download:
         download_if_not_exists(PRIMARY_MODEL_URL, args.primary_model)

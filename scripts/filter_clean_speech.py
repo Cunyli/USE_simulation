@@ -2,7 +2,7 @@ import argparse
 import json
 from pathlib import Path
 
-from scripts.quality_filtering import (
+from scripts.quality_utils import (
     QualityFilterConfig,
     filter_clean_paths,
     load_json_list,

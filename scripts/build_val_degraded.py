@@ -8,7 +8,7 @@ import soundfile as sf
 import yaml
 
 from simulate_degradation import apply_degradation_with_wind, random_select_and_order
-from scripts.quality_filtering import (
+from scripts.quality_utils import (
     QualityFilterConfig,
     filter_clean_paths,
     load_quality_scores,
